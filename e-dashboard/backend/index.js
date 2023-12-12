@@ -1,3 +1,6 @@
+// app.post is used if we want to save or send the data in/to the database
+// app.get is ised if we want some data from the database
+
 const express = require('express'); // import express
 const app = express();
 
@@ -43,6 +46,17 @@ app.post('/addproduct', async (request, response) => {
     let product = new Product(request.body);
     let result = await product.save();
     response.send(result);
+})
+
+//backend for product listing
+app.get('/products', async (request, response) => {
+    let products = await Product.find();
+    if(products.length > 0) {
+        response.send(products);
+    }
+    else{
+        response.send({result: 'No Products Found'});
+    }
 })
 
 
