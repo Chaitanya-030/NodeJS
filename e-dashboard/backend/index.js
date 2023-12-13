@@ -65,5 +65,28 @@ app.delete('/product/:id', async (request, response) => {
     response.send(result);
 })
 
+// to get the single product to fill information in update form
+app.get('/product/:id', async (request, response) => {
+    let result = await Product.findOne({_id: request.params.id});
+    if(result) {
+        response.send(result);
+    }
+    else {
+        response.send({result: 'No Record Found'});
+    }
+})
+
+// to update the product with given information
+app.put('/product/:id', async (request, response) => {
+    let result = await Product.updateOne(
+        {_id: request.params.id}, 
+        {
+            $set: request.body
+        }
+    );
+    response.send(result);
+})
+
+
 
 app.listen(5000);
