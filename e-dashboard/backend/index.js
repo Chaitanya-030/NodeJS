@@ -12,6 +12,9 @@ const cors = require('cors'); // for specific error
 const User = require("./db/User");
 const Product = require("./db/Product");
 
+const Jwt = require('jsonwebtoken');
+const jwtKey = 'e-commerce';
+
 
 app.use(express.json());
 app.use(cors());
@@ -22,7 +25,12 @@ app.post("/register", async (request, response) => {
     let result = await user.save();
     result = result.toObject();
     delete result.password;
-    response.send(result);
+    Jwt.sign({result}, jwtKey, {expiresIn: "2h"}, (error, token) => {
+        if(error) {
+            response.send({result: 'Something went wrong'});
+        }
+        response.send({result, auth: token})
+    })
 })
 
 // backend for login
@@ -30,7 +38,12 @@ app.post('/login', async (request, response) => {
     if(request.body.password && request.body.email) {
         let user = await User.findOne(request.body).select("-password");
         if(user) {
-            response.send(user)
+            Jwt.sign({user}, jwtKey, {expiresIn: "2h"}, (error, token) => {
+                if(error) {
+                    response.send({result: 'Something went wrong'});
+                }
+                response.send({user, auth: token})
+            })    
         }
         else {
             response.send({result: 'User Not Found'})
@@ -42,14 +55,14 @@ app.post('/login', async (request, response) => {
 })
 
 // backend for add product
-app.post('/addproduct', async (request, response) => {
+app.post('/addproduct', verifyToken, async (request, response) => {
     let product = new Product(request.body);
     let result = await product.save();
     response.send(result);
 })
 
 //backend for product listing
-app.get('/products', async (request, response) => {
+app.get('/products', verifyToken, async (request, response) => {
     let products = await Product.find();
     if(products.length > 0) {
         response.send(products);
@@ -60,13 +73,13 @@ app.get('/products', async (request, response) => {
 })
 
 //delete product from database
-app.delete('/product/:id', async (request, response) => {
+app.delete('/product/:id', verifyToken, async (request, response) => {
     const result = await Product.deleteOne({_id: request.params.id});
     response.send(result);
 })
 
 // to get the single product to fill information in update form
-app.get('/product/:id', async (request, response) => {
+app.get('/product/:id', verifyToken, async (request, response) => {
     let result = await Product.findOne({_id: request.params.id});
     if(result) {
         response.send(result);
@@ -77,7 +90,7 @@ app.get('/product/:id', async (request, response) => {
 })
 
 // to update the product with given information
-app.put('/product/:id', async (request, response) => {
+app.put('/product/:id', verifyToken, async (request, response) => {
     let result = await Product.updateOne(
         {_id: request.params.id}, 
         {
@@ -88,7 +101,7 @@ app.put('/product/:id', async (request, response) => {
 })
 
 // to search the product by name, category, ....
-app.get('/search/:key', async (request, response) => {
+app.get('/search/:key', verifyToken, async (request, response) => {
     let result = await Product.find({
         "$or" : [
             {name : {$regex: request.params.key}},
@@ -98,6 +111,27 @@ app.get('/search/:key', async (request, response) => {
     });
     response.send(result)
 })
+
+// to verify the token and then only allow to do the operations
+function verifyToken(request, response, next) {
+    let token = request.headers['authorization'];
+    if(token) {
+        token = token.split(' ')[1];
+        Jwt.verify(token, jwtKey, (error, valid) => {
+            if(error) {
+                response.status(401).send({result: 'Please provide valid token'})
+            }
+            else {
+                next();
+            }
+        })
+    }
+    else {
+        response.status(403).send({result: 'Please add token with header'})
+    }
+    console.warn('middleware called...', token)
+    next();
+}
 
 
 
